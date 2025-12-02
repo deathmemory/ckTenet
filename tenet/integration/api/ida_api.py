@@ -23,7 +23,6 @@ import ida_diskio
 import ida_kernwin
 import ida_segment
 import ida_ida # 添加对ida_ida的导入，用于IDA 9.0+ 兼容
-from PyQt5 import QtCore
 
 from tenet.trace.arch import ArchX86, ArchAMD64, ArchAArch64 # Import Arch classes
 from .api import DisassemblerCoreAPI, DisassemblerContextAPI

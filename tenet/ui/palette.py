@@ -545,7 +545,8 @@ class PluginPalette(object):
         if disassembler.NAME == "BINJA":
             test_widget.setAttribute(QtCore.Qt.WA_DontShowOnScreen)
         else:
-            test_widget.setAttribute(103) # taken from http://doc.qt.io/qt-5/qt.html
+            # Use WA_DontShowOnScreen (103) as an enum instead of raw integer for PySide6 compatibility
+            test_widget.setAttribute(QtCore.Qt.WA_DontShowOnScreen)
 
         # render the (invisible) widget
         test_widget.show()
