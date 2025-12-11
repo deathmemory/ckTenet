@@ -158,7 +158,7 @@ class TenetIDA(TenetCore):
     ACTION_STEP_OUT        = "tenet:step_out"
     ACTION_CONTINUE        = "tenet:continue"
     ACTION_PREV_INSN       = "tenet:prev_insn" # New action for previous instruction
-    ACTION_PREV_INSN       = "tenet:prev_insn" # New action for previous instruction
+    ACTION_LOAD_MEMORY_DUMPS = "tenet:load_memory_dumps" # New action for loading memory dumps from directory
 
     def _install_load_trace(self):
 
@@ -452,6 +452,23 @@ class TenetIDA(TenetCore):
         logger.info(f"Successfully registered '{action_desc.name}' action with shortcut 'Ctrl+Shift+B'.")
         return True
 
+    def _install_load_memory_dumps(self):
+        """Install the 'Load Memory Dumps from Directory' action."""
+        action_desc = ida_kernwin.action_desc_t(
+            self.ACTION_LOAD_MEMORY_DUMPS,
+            "Load Memory Dumps from Directory",
+            IDACtxEntry(self._handle_load_memory_dumps),
+            "Ctrl+Alt+L", # Shortcut
+            "Load memory dump files from a directory into memory view",
+            -1 # Optional: Add an icon later if desired
+        )
+        result = ida_kernwin.register_action(action_desc)
+        if not result:
+             logger.error("Failed to register '{}' action with IDA. Result: {}".format(action_desc.name, result))
+             return False
+        logger.info("Successfully registered '{}' action with shortcut 'Ctrl+Alt+L'.".format(action_desc.name))
+        return True
+
     def _uninstall_step_over(self):
         return self._uninstall_action(self.ACTION_STEP_OVER)
 
@@ -468,9 +485,9 @@ class TenetIDA(TenetCore):
         """Uninstall the 'Previous Instruction' action."""
         return self._uninstall_action(self.ACTION_PREV_INSN)
 
-    def _uninstall_prev_insn(self):
-        """Uninstall the 'Previous Instruction' action."""
-        return self._uninstall_action(self.ACTION_PREV_INSN)
+    def _uninstall_load_memory_dumps(self):
+        """Uninstall the 'Load Memory Dumps from Directory' action."""
+        return self._uninstall_action(self.ACTION_LOAD_MEMORY_DUMPS)
 
     def _install_actions(self):
         """Install all IDA actions for Tenet. Attempts to unregister first."""
@@ -488,7 +505,7 @@ class TenetIDA(TenetCore):
         self._uninstall_step_out()
         self._uninstall_continue()
         self._uninstall_prev_insn() # Add uninstall for previous instruction
-        self._uninstall_prev_insn() # Add uninstall for previous instruction
+        self._uninstall_load_memory_dumps() # Add uninstall for load memory dumps
 
         # Now attempt to install actions
         results = []
@@ -505,7 +522,8 @@ class TenetIDA(TenetCore):
         results.append(self._install_step_out())
         results.append(self._install_continue())
         results.append(self._install_prev_insn()) # Add install for previous instruction
-        
+        results.append(self._install_load_memory_dumps()) # Add install for load memory dumps
+
         # Check if essential actions failed (e.g., load trace)
         if not results[0]: # Check if the first essential action failed
             logger.error("Failed to install essential action 'tenet:load_trace'.")
@@ -543,6 +561,7 @@ class TenetIDA(TenetCore):
         self._uninstall_step_out()
         self._uninstall_continue()
         self._uninstall_prev_insn() # Add uninstall for previous instruction
+        self._uninstall_load_memory_dumps() # Add uninstall for load memory dumps
 
     #--------------------------------------------------------------------------
     # UI Event Handlers
@@ -1061,7 +1080,59 @@ class TenetIDA(TenetCore):
 
         except Exception as e:
             logger.exception("Error during Continue:")
-            ida_kernwin.warning(f"Tenet: Error during continue: {e}")
+            ida_kernwin.warning("Tenet: Error during continue: {}".format(e))
+
+    def _handle_load_memory_dumps(self, dctx):
+        """Handle the 'Load Memory Dumps from Directory' action."""
+        import ida_kernwin
+        import os
+
+        # Open a directory selection dialog
+        # Use ida_kernwin.ask_file with a pattern that forces directory selection
+        directory_path = ida_kernwin.ask_file(0, "*", "Select a file in the directory containing memory dump files (directory path will be extracted):")
+        if not directory_path:
+            return  # User cancelled
+
+        # If user selected a file, get its directory
+        if os.path.isfile(directory_path):
+            directory_path = os.path.dirname(directory_path)
+        elif not os.path.isdir(directory_path):
+            # If it's not a file and not a directory, ask again with string input
+            directory_path = ida_kernwin.ask_str("", 0, "Enter the full path to the directory containing memory dump files:")
+            if not directory_path:
+                return  # User cancelled
+
+        if not directory_path:
+            return  # User cancelled
+
+        # Validate the directory exists
+        if not os.path.isdir(directory_path):
+            ida_kernwin.warning("Directory does not exist: {}".format(directory_path))
+            return
+
+        # Get the memory controller and load the dumps
+        try:
+            ctx = self.get_context(dctx, startup=False)
+            if not ctx:
+                ida_kernwin.warning("Tenet: No active context.")
+                return
+
+            # Get the memory controller
+            memory_controller = getattr(ctx, 'memory', None)
+            if not memory_controller:
+                ida_kernwin.warning("Tenet: Memory controller not available.")
+                return
+
+            # Call the directory loading function
+            success = memory_controller.load_memory_dumps_from_directory(directory_path)
+            if success:
+                ida_kernwin.info("Successfully loaded memory dumps from: {}".format(directory_path))
+            else:
+                ida_kernwin.warning("No memory dumps were loaded from: {}".format(directory_path))
+
+        except Exception as e:
+            logger.exception("Error during Load Memory Dumps:")
+            ida_kernwin.warning("Tenet: Error loading memory dumps: {}".format(e))
 
 #------------------------------------------------------------------------------
 # IDA UI Helpers
