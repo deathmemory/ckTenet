@@ -171,8 +171,8 @@ class MemoryController(HexController):
         import json
         import zipfile
 
-        import pydevd_pycharm
-        pydevd_pycharm.settrace('localhost', port=12345, stdoutToServer=True, stderrToServer=True)
+        # import pydevd_pycharm
+        # pydevd_pycharm.settrace('localhost', port=12345, stdoutToServer=True, stderrToServer=True)
 
         if not os.path.isdir(directory_path):
             print("Error: Directory does not exist: {}".format(directory_path))
